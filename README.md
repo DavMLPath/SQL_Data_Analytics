@@ -1,6 +1,6 @@
 # SQL_Data_Analytics
 
-Here is described which steps need to be completed after getting row data.
+Here are described necessary steps to complete after getting row data.
 
 It includes:
 1)Getting row count, count of unique values for each row
