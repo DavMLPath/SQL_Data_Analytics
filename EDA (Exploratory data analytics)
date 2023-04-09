@@ -1,0 +1,118 @@
+
+--Here is the link to the data source in Kaggle:
+-- https://www.kaggle.com/datasets/lakshmi25npathi/online-retail-dataset
+
+
+/****** Script for SelectTopNRows command from SSMS  ******/
+SELECT TOP (1000) [Invoice]
+      ,[StockCode]
+      ,[Description]
+      ,[Quantity]
+      ,[InvoiceDate]
+      ,[Price]
+      ,[Customer_ID]
+      ,[Country]
+  FROM [hello_me].[dbo].[online_retail]
+
+
+
+  --Exploratory data analyses
+  
+--  1)Getting types of all columnes
+SELECT 
+    COLUMN_NAME, 
+    DATA_TYPE
+	FROM INFORMATION_SCHEMA.COLUMNS 
+WHERE TABLE_NAME = 'online_retail' 
+
+--as we see, all columns are in proper format
+
+--2)Now lets identify, if there are eny null values in one of columnes
+
+  SELECT SUM(CASE WHEN Invoice is Null Then 1 else 0 end) AS Null_invoice,
+		 SUM(CASE WHEN StockCode is Null Then 1 else 0 end) AS Null_StockCode,
+		 SUM(CASE WHEN DESCRIPTION is Null Then 1 else 0 end) AS Null_Description,
+		 SUM(CASE WHEN Quantity is Null Then 1 else 0 end) AS Null_Quantity,
+		 SUM(CASE WHEN InvoiceDate is Null Then 1 else 0 end) AS Null_InvoiceDate,
+		 SUM(CASE WHEN Price is Null Then 1 else 0 end) AS Null_Price,
+		 SUM(CASE WHEN Customer_ID is Null Then 1 else 0 end) AS Null_CustomerId,
+		 SUM(CASE WHEN Country is Null Then 1 else 0 end) AS Null_country
+  FROM [online_retail]
+  --after running query, we can see that there are  null values in description and customer_id, whuch is good
+  --3)Table size, Unique VS duplicate values 
+  --AS we see from above query results, we dont have null values in none of the columns
+  SELECT COUNT(*) AS row_num,
+		 COUNT(DISTINCT Invoice) AS Invoice_distinct,
+		 COUNT(DISTINCT Description) AS Description_distinct,
+		 COUNT(DISTINCT StockCode) AS stock_code_distinct,
+		 COUNT(DISTINCT InvoiceDate) AS InvoiceDate_distinct,
+		 COUNT(DISTINCT Customer_ID) AS Customer_ID_distinct,
+		 COUNT(DISTINCT Country) AS Country_distinct
+	FROM [online_retail]
+
+ --As we see, we have total 525461 rows, and invoices may repeat, as well as descriptions, stock codes, dates
+ --in total, we have 4383 customers from 40 countries. Based on the invoice counte, we can assume, that they made 28816 orders
+
+
+--4) min and max values of quantitive/date values
+SELECT MIN(Quantity) AS minQuantity,
+		Max(Quantity) AS maxQuantity,
+		Min(InvoiceDate) AS MinInvoiceDate,
+		MAX(InvoiceDate) AS MAXInvoiceDate,
+		Min(InvoiceDate)-MAX(InvoiceDate) AS daynum,
+		MIN(Price) AS MINPrice, 
+		Max(Price) AS MaxPrice
+	FROM online_retail
+/*
+As we see from above analyses, our data has some issues:
+!! quantity and price cant be negative number. 
+we can solve it by removing them, but lets see how many are thay
+*/
+SELECT SUM(CASE WHEN quantity<0 THEN 1 ELSE 0 END) AS NegativeQuantity,
+		SUM(CASE WHEN Price<0 THEN 1 ELSE 0 END) AS NegativePrice
+FROM online_retail
+
+--As we see, there are just 3 rows with negative price, but negative price is quite a lot
+--Lets see their country distribution
+
+SELECT country,  COUNT(*) AS num
+FROM online_retail
+WHERE Quantity<0
+GROUP BY COUNTRY
+ORDER BY num desc
+
+--As wee see, majority are coming from UK
+
+
+--5)Now lets get rid of the negative values, and create cte for clear table
+
+WITH t1 AS(
+SELECT * FROM
+online_retail
+WHERE Quantity>=0 AND Price>=0
+AND Customer_ID is not null)
+SELECT TOP 200 * FROM T1
+
+
+--Now we have clear table, and we can add columns
+--it can be deviding users by their purchase amount , also products by price
+
+--6) Lets create 2 conditional columns, that will create groups based on quantity and price
+
+WITH t2 AS(
+SELECT *, 
+		PERCENT_RANK() OVER(ORDER BY Quantity)  AS pr,
+		PERCENT_RANK() OVER(ORDER BY Price)  AS pr_Price
+FROM online_retail
+WHERE Quantity>=0 AND Price>=0
+AND Customer_ID is not null
+)
+SELECT *, CASE WHEN pr<=0.25 THEN 1
+			   WHEN pr<=0.5 THEN 2
+			   WHEN pr<=0.75 THEN 3
+		  ELSE 4 END AS group_per_quantity,
+		  CASE WHEN pr_Price<=0.25 THEN 1
+			   WHEN pr_Price<=0.5 THEN 2
+			   WHEN pr_Price<=0.75 THEN 3
+		  ELSE 4 END AS group_per_price
+FROM t2 
